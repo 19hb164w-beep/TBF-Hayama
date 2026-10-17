@@ -2,7 +2,7 @@
 // 管理画面が、枠の中に表示したお客様画面にこのファイルを読み込ませて起動する。
 // お客様画面（index.html）単体ではこのファイルは読み込まれない。
 // 点線の部分をタップして文章を書き換え、写真やメニューの品目を変え、「保存して公開」で反映する。
-import { isDemo, watchAuth, isAdminEmail, saveContent, compressImage } from './store.js';
+import { isDemo, watchAuth, saveContent, compressImage } from './store.js';
 import { hooks, setImage, syncTel, refreshOptional, refreshVideos, serializeList, createItem } from './content.js';
 
 export const editorState = { dirty: false };
@@ -268,8 +268,8 @@ function enable() {
 let started = false;
 export function startEditor() {
   // 管理者としてログインしているときだけ編集できる（保存の可否は Firebase のルールでも判定）
-  watchAuth(user => {
-    if (started || !user || !(isDemo || isAdminEmail(user.email))) return;
+  watchAuth(adminUser => {
+    if (started || !adminUser) return;
     started = true;
     buildBar();
     enable();

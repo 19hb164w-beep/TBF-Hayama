@@ -12,6 +12,7 @@ export const KIND_LABEL = {
   hours: '時間変更',
   open: '臨時営業',
   soldout: '売り切れ終了',
+  mark: 'アイコン・文字だけ',
 };
 
 const HOLIDAYS_URL = 'https://holidays-jp.github.io/api/v1/date.json';
@@ -89,6 +90,46 @@ export function regularPeriods(date, ctx) {
   return (wd === 0 || wd === 6 || ctx.holidays[date]) ? [LUNCH, DINNER] : [LUNCH];
 }
 
+/* ---------- お客様に表示する文言（管理画面の「表示する文言」で変更できる） ---------- */
+// {start} {end} {next} は時刻などに置き換わる
+export const MESSAGES = {
+  'msg-open':          { label: '営業中（見出し）',             def: '営業中' },
+  'msg-open-sub':      { label: '営業中（補足）',               def: '本日は {end} まで' },
+  'msg-prep-first':    { label: '開店前',                       def: '本日は {start} から営業します' },
+  'msg-prep-between':  { label: 'ランチとディナーの間',          def: '準備中（{start} から営業）' },
+  'msg-ended':         { label: '営業終了後',                   def: '本日の営業は終了しました' },
+  'msg-regular-off':   { label: '定休日',                       def: '本日は定休日です' },
+  'msg-closed':        { label: '臨時休業の日',                 def: '本日は臨時休業です' },
+  'msg-private':       { label: '貸切の日',                     def: '本日は貸切のため休業です' },
+  'msg-soldout':       { label: '売り切れで終了したとき',        def: 'スープが売り切れました。ありがとうございました。' },
+  'msg-next':          { label: '次の営業日の案内',              def: '次の営業：{next}' },
+  'pill-open':         { label: '右上の表示：営業中',            def: '営業中' },
+  'pill-prep':         { label: '右上の表示：準備中',            def: '準備中' },
+  'pill-ended':        { label: '右上の表示：営業終了後',        def: '本日終了' },
+  'pill-off':          { label: '右上の表示：定休日',            def: '定休日' },
+  'pill-closed':       { label: '右上の表示：臨時休業',          def: '臨時休業' },
+  'pill-private':      { label: '右上の表示：貸切',              def: '貸切' },
+  'cal-lunch':         { label: 'カレンダー：ランチのみの日',     def: '昼' },
+  'cal-full':          { label: 'カレンダー：ランチ・ディナーの日', def: '昼夜' },
+  'cal-off':           { label: 'カレンダー：定休日',            def: '定休' },
+  'cal-closed':        { label: 'カレンダー：臨時休業',          def: '休業' },
+  'cal-private':       { label: 'カレンダー：貸切',              def: '貸切' },
+  'cal-change':        { label: 'カレンダー：時間変更',          def: '変更' },
+  'cal-open':          { label: 'カレンダー：臨時営業',          def: '営業' },
+};
+let custom = {};
+export function setMessages(texts) {
+  custom = {};
+  for (const k of Object.keys(MESSAGES)) if (texts?.[k]) custom[k] = texts[k];
+}
+export function msg(key, vars = {}) {
+  const t = custom[key] ?? MESSAGES[key]?.def ?? '';
+  return t.replace(/\{(\w+)\}/g, (_, v) => vars[v] ?? '');
+}
+
+// カレンダーのマスに選べるアイコン
+export const DAY_ICONS = ['🍜', '🐚', '🎉', '🎄', '🎍', '🌸', '🎆', '🏖️', '🐟', '⭐', '❤️', '🎵', '📢', '🛠️', '🧒', '🍙'];
+
 export function getDay(date, ctx) {
   const wd = weekday(date);
   const regular = regularPeriods(date, ctx);
@@ -96,11 +137,15 @@ export function getDay(date, ctx) {
     date, wd, isHoliday: !!ctx.holidays[date], holidayName: ctx.holidays[date] || '',
     periods: regular, reason: regular.length ? '' : '定休日',
     tag: '', notes: [], irregular: false, soldout: false, entries: ctx.ex[date] || [],
+    icon: '', label: '',
   };
 
   for (const e of day.entries) {
-    day.irregular = true;
     if (e.note) day.notes.push(e.note);
+    if (e.icon) day.icon = e.icon;
+    if (e.label) day.label = e.label;
+    if (e.kind === 'mark') continue; // 目印だけ（営業時間は変えない）
+    day.irregular = true;
     if (e.kind === 'closed') { day.periods = []; day.reason = day.tag = '臨時休業'; }
     else if (e.kind === 'private') {
       if (e.hoursList.length) {
@@ -140,27 +185,30 @@ export function nextOpen(from, min, ctx) {
 export function todayStatus(now, ctx) {
   const d = getDay(now.date, ctx);
   const hours = d.soldout ? '売り切れのため終了' : (d.periods.length ? periodText(d.periods) : closedText(d));
-  const nxt = () => { const n = nextOpen(now.date, now.min, ctx); return n ? `次の営業：${n}` : ''; };
+  const nxt = () => { const n = nextOpen(now.date, now.min, ctx); return n ? msg('msg-next', { next: n }) : ''; };
   const base = { hours, d, notes: d.notes };
 
-  if (d.soldout) return { ...base, cls: 'is-closed', pill: '本日終了', head: '本日の営業は終了しました', sub: ['スープが売り切れました。ありがとうございました。', nxt()].filter(Boolean).join('\n') };
+  if (d.soldout) return { ...base, cls: 'is-closed', pill: msg('pill-ended'), head: msg('msg-ended'), sub: [msg('msg-soldout'), nxt()].filter(Boolean).join('\n') };
   if (!d.periods.length) {
-    const alert = d.reason !== '定休日';
-    return { ...base, cls: alert ? 'is-alert' : 'is-closed', pill: d.reason, head: `本日は${closedText(d)}です`, sub: nxt() };
+    const kind = d.reason === '定休日' ? 'off' : d.reason === '貸切' ? 'private' : 'closed';
+    return {
+      ...base, cls: kind === 'off' ? 'is-closed' : 'is-alert',
+      pill: msg(`pill-${kind}`), head: msg(kind === 'off' ? 'msg-regular-off' : `msg-${kind}`), sub: nxt(),
+    };
   }
   for (let i = 0; i < d.periods.length; i++) {
     const [s, e] = d.periods[i];
     if (now.min < s) {
       return i === 0
-        ? { ...base, cls: 'is-prep', pill: `${fmt(s)}〜営業`, head: `本日は ${fmt(s)} から営業します`, sub: '' }
-        : { ...base, cls: 'is-prep', pill: '準備中', head: `準備中（${fmt(s)} から営業）`, sub: '' };
+        ? { ...base, cls: 'is-prep', pill: `${fmt(s)}〜営業`, head: msg('msg-prep-first', { start: fmt(s) }), sub: '' }
+        : { ...base, cls: 'is-prep', pill: msg('pill-prep'), head: msg('msg-prep-between', { start: fmt(s) }), sub: '' };
     }
     if (now.min < e) {
       const later = i < d.periods.length - 1 ? `（次は ${fmt(d.periods[i + 1][0])}〜）` : '';
-      return { ...base, cls: 'is-open', pill: '営業中', head: '営業中', sub: `本日は ${fmt(e)} まで${later}` };
+      return { ...base, cls: 'is-open', pill: msg('pill-open'), head: msg('msg-open'), sub: msg('msg-open-sub', { end: fmt(e) }) + later };
     }
   }
-  return { ...base, cls: 'is-closed', pill: '本日終了', head: '本日の営業は終了しました', sub: nxt() };
+  return { ...base, cls: 'is-closed', pill: msg('pill-ended'), head: msg('msg-ended'), sub: nxt() };
 }
 
 // 2週間カレンダーの <li> 群
@@ -191,7 +239,20 @@ export function dayDetail(date, ctx, now) {
   else if (!d.periods.length) text = closedText(d);
   else text = `${d.irregular && d.tag ? `【${d.tag}】` : ''}営業 ${periodText(d.periods)}`;
   const extra = [d.holidayName, ...d.notes].filter(Boolean).join(' / ');
-  return { label: dayLabel(date), text, extra, irregular: d.irregular };
+  return { label: `${dayLabel(date)}${d.icon ? ' ' + d.icon : ''}`, text, extra, irregular: d.irregular };
+}
+
+// マスに出す色の種類と短い文字
+export function cellLabel(date, ctx, now) {
+  const d = getDay(date, ctx);
+  let st, lb;
+  if (d.soldout && date === now.date) { st = 'st-off'; lb = msg('pill-ended'); }
+  else if (!d.periods.length) {
+    if (d.reason === '定休日') { st = 'st-off'; lb = msg('cal-off'); }
+    else { st = 'st-alert'; lb = msg(d.reason === '貸切' ? 'cal-private' : 'cal-closed'); }
+  } else if (d.irregular) { st = 'st-change'; lb = msg(d.tag === '臨時営業' ? 'cal-open' : 'cal-change'); }
+  else { st = d.periods.length > 1 ? 'st-full' : 'st-lunch'; lb = msg(d.periods.length > 1 ? 'cal-full' : 'cal-lunch'); }
+  return { st, lb: d.label || lb, icon: d.icon, d };
 }
 
 // 1か月分のカレンダー（横：曜日、縦：週）
@@ -204,15 +265,8 @@ export function monthHTML(year, month, now, ctx) {
 
   for (let day = 1; day <= days; day++) {
     const date = ymd(year, month, day);
-    const d = getDay(date, ctx);
+    const { st, lb, icon, d } = cellLabel(date, ctx, now);
     const past = date < now.date;
-    let st, lb;
-    if (d.soldout && date === now.date) { st = 'st-off'; lb = '終了'; }
-    else if (!d.periods.length) {
-      if (d.reason === '定休日') { st = 'st-off'; lb = '定休'; }
-      else { st = 'st-alert'; lb = d.reason === '貸切' ? '貸切' : '休業'; }
-    } else if (d.irregular) { st = 'st-change'; lb = d.tag === '臨時営業' ? '営業' : '変更'; }
-    else { st = d.periods.length > 1 ? 'st-full' : 'st-lunch'; lb = d.periods.length > 1 ? '昼夜' : '昼'; }
 
     const cls = [
       'cell', st,
@@ -222,7 +276,8 @@ export function monthHTML(year, month, now, ctx) {
     ].join(' ');
     const det = dayDetail(date, ctx, now);
     const aria = `${det.label} ${det.text}${det.extra ? ' ' + det.extra : ''}`;
-    cells.push(`<td><button type="button" class="${cls}" data-date="${date}" aria-label="${esc(aria)}"><span class="num">${day}</span><span class="lb">${past ? '' : lb}</span></button></td>`);
+    const ic = !past && icon ? `<span class="ic" aria-hidden="true">${esc(icon)}</span>` : '';
+    cells.push(`<td><button type="button" class="${cls}" data-date="${date}" aria-label="${esc(aria)}"><span class="num">${day}${ic}</span><span class="lb">${past ? '' : esc(lb)}</span></button></td>`);
   }
   while (cells.length % 7) cells.push('<td class="blank"></td>');
 
@@ -233,7 +288,8 @@ export function monthHTML(year, month, now, ctx) {
 }
 
 // 月送り付きカレンダーを root に組み立てる（お客様画面・管理画面共通）
-export function mountMonthCalendar(root, getState, monthsAhead = 2) {
+// onSelect(date) を渡すと、日付をタップしたときに呼ばれる（管理画面でその日を編集する用）
+export function mountMonthCalendar(root, getState, monthsAhead = 2, { onSelect, hint } = {}) {
   let offset = 0, selected = null;
   root.innerHTML = `
     <div class="month-nav">
@@ -242,17 +298,17 @@ export function mountMonthCalendar(root, getState, monthsAhead = 2) {
       <button type="button" class="mnext" aria-label="次の月">›</button>
     </div>
     <div class="mgrid"></div>
-    <div class="legend">
-      <span><i class="st-lunch"></i>昼＝ランチのみ</span>
-      <span><i class="st-full"></i>昼夜＝ランチ・ディナー</span>
-      <span><i class="st-off"></i>定休日</span>
-      <span><i class="st-alert"></i>臨時休業・貸切</span>
-      <span><i class="st-change"></i>時間変更など</span>
-    </div>
+    <div class="legend"></div>
     <p class="day-detail" aria-live="polite"></p>`;
 
   const render = () => {
     const { now, ctx } = getState();
+    root.querySelector('.legend').innerHTML = `
+      <span><i class="st-lunch"></i>${esc(msg('cal-lunch'))}＝ランチのみ</span>
+      <span><i class="st-full"></i>${esc(msg('cal-full'))}＝ランチ・ディナー</span>
+      <span><i class="st-off"></i>${esc(msg('cal-off'))}＝定休日</span>
+      <span><i class="st-alert"></i>臨時休業・貸切</span>
+      <span><i class="st-change"></i>時間変更など</span>`;
     const [y0, m0] = now.date.split('-').map(Number);
     const t = new Date(Date.UTC(y0, m0 - 1 + offset, 1));
     const y = t.getUTCFullYear(), m = t.getUTCMonth() + 1;
@@ -270,7 +326,7 @@ export function mountMonthCalendar(root, getState, monthsAhead = 2) {
       out.innerHTML = `<b>${esc(det.label)}</b> ${esc(det.text)}${det.extra ? `<small>${esc(det.extra)}</small>` : ''}`;
       out.classList.toggle('irregular', det.irregular);
     } else {
-      out.textContent = '日付をタップすると、その日の営業時間が表示されます';
+      out.textContent = hint || '日付をタップすると、その日の営業時間が表示されます';
       out.classList.remove('irregular');
     }
   };
@@ -282,6 +338,7 @@ export function mountMonthCalendar(root, getState, monthsAhead = 2) {
     if (!c) return;
     selected = c.dataset.date;
     render();
+    onSelect?.(selected);
   });
   return render;
 }
@@ -294,7 +351,7 @@ export function alertsHTML(now, ctx, days = 14, max = 3) {
     if (!d.irregular || !d.tag || d.soldout) continue;
     const hours = d.periods.length ? esc(`（営業時間 ${periodText(d.periods)}）`) : '';
     const memo = d.notes.length ? `<br>${esc(d.notes.join(' / '))}` : '';
-    items.push(`<li><b>${esc(dayLabel(date))} ${esc(d.tag)}</b>${hours}${memo}</li>`);
+    items.push(`<li><b>${esc(dayLabel(date))}${d.icon ? ' ' + esc(d.icon) : ''} ${esc(d.label || d.tag)}</b>${hours}${memo}</li>`);
   }
   return items.join('');
 }

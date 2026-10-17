@@ -9,7 +9,8 @@ export const FIREBASE_CONFIG = {
   appId: '1:804527479812:web:f739cd561f6ade105de951',
 };
 
-// 管理画面にログインできるメールアドレス（firestore.rules にも同じものを書く）
+// オーナーのメールアドレス（常に管理者。firestore.rules の isOwner にも同じものを書く）
+// ほかの管理者は、管理画面の「管理者」タブから追加・削除できる
 export const ADMIN_EMAILS = [
   '19hb164w@gmail.com',
 ];
