@@ -9,6 +9,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&family=Cormorant+Garamond:ital,wght@0,600;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/month.css">
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link rel="modulepreload" href="js/schedule.js">
+<link rel="modulepreload" href="js/store.js">
+<link rel="modulepreload" href="js/content.js">
+<link rel="modulepreload" href="js/config.js">
 <script>
   // 管理画面で保存した文言・構成・色を読み込むまで、ページを隠しておく
   // （HTML に書かれた最初の文言が一瞬見えてから切り替わるのを防ぐ）。通信が遅いときは最大3.5秒で表示する。
@@ -195,6 +200,11 @@
   .media-item p { font-size: 14px; color: var(--muted); margin-top: 6px; }
   .video { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; display: grid; place-items: center; color: #aaa; font-size: 13px; }
   .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .yt-thumb { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: #000; cursor: pointer; }
+  .yt-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .9; }
+  .yt-play { position: absolute; left: 50%; top: 50%; width: 68px; height: 48px; transform: translate(-50%, -50%); background: #f00; border-radius: 12px; }
+  .yt-play::after { content: ""; position: absolute; left: 27px; top: 14px; border-style: solid; border-width: 10px 0 10px 17px; border-color: transparent transparent transparent #fff; }
+  .yt-thumb:hover .yt-play { background: #c00; }
   .url-field { font-size: 13px; color: var(--muted); margin-top: 10px; background: #fff; padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; word-break: break-all; }
   .url-field b { color: var(--sea); margin-right: 6px; }
 
@@ -649,33 +659,39 @@
 /* ===== 営業状況・ページ内容・構成 =====
    このページ自体には編集機能はない。文章・写真・メニュー・構成・色は管理画面（admin.html）から変更する。 */
 import { jstNow, makeContext, todayStatus, alertsHTML, dayLabel, esc, loadHolidays, addDays, mountMonthCalendar, setMessages } from './js/schedule.js';
-import { watchExceptions, watchContent, watchLayout } from './js/store.js';
+import { fetchSite, fetchImages, fetchExceptions } from './js/store.js';
 import { captureDefaults, applyContent, applyLayout, refreshOptional, refreshVideos, hooks } from './js/content.js';
 
 let holidays = {}, exceptions = [], loadOk = true, loaded = false;
+
+// 通信はすべて同時に始める（順番に待つと、スマホの回線では表示が遅くなる）
+const fromDate = addDays(jstNow().date, -1);
+const siteP = fetchSite();
+const exceptionsP = fetchExceptions(fromDate);
+const holidaysP = loadHolidays();
 
 /* --- 文章・写真・メニュー・構成・色 --- */
 captureDefaults();
 refreshVideos();
 refreshOptional();
 applyLayout(null);
-// 保存済みの文言と構成の両方が届いたら、ページを表示する
-let gotContent = false, gotLayout = false;
 const reveal = () => document.documentElement.classList.remove('is-preparing');
-const maybeReveal = () => { if (gotContent && gotLayout) reveal(); };
-watchContent(c => {
+let content = { texts: {}, menu: {}, images: {} };
+
+// 保存済みの文言と構成が届いたら、ページを表示する（写真はそのあとで差し込む）
+siteP.then(({ content: c, layout }) => {
   // 「本日は臨時休業です」などの文言も管理画面で変更できる
   setMessages(c.texts);
+  content = { ...content, ...c };
+  if (!hooks.isDirty?.()) applyContent(content);
+  applyLayout(hooks.layoutOverride ?? layout);
   if (loaded) render();
-  if (!hooks.isDirty?.()) applyContent(c);
-  gotContent = true;
-  maybeReveal();
-}, reveal);
-watchLayout(l => {
-  applyLayout(hooks.layoutOverride ?? l);
-  gotLayout = true;
-  maybeReveal();
-}, reveal);
+}).catch(() => {}).finally(reveal);
+
+Promise.all([siteP.catch(() => null), fetchImages()]).then(([, images]) => {
+  content = { ...content, images };
+  if (!hooks.isDirty?.()) applyContent(content);
+}).catch(() => {});
 
 /* --- 営業状況 --- */
 const CAL_NOTE = document.getElementById('calStatus').innerHTML;
@@ -706,17 +722,20 @@ function render() {
   s.innerHTML = loadOk ? CAL_NOTE : FAIL_NOTE;
 }
 
-holidays = await loadHolidays();
-// 管理画面で変更されると、開いているお客様の画面にもその場で反映される
-watchExceptions(
-  addDays(jstNow().date, -1),
-  list => { exceptions = list; loadOk = true; loaded = true; render(); },
-  () => { loadOk = false; loaded = true; render(); },
-);
+holidaysP.then(h => { holidays = h; if (loaded) render(); });
+exceptionsP
+  .then(list => { exceptions = list; loadOk = true; })
+  .catch(() => { loadOk = false; })
+  .finally(() => { loaded = true; render(); });
 // 通信が遅すぎるときは通常の営業時間で表示して、Instagram を案内する
 setTimeout(() => { if (!loaded) { loadOk = false; render(); } }, 8000);
 // 開きっぱなしでも「営業中→本日終了」などが切り替わるよう1分ごとに再描画
 setInterval(() => { if (loaded) render(); }, 60 * 1000);
+// 管理画面での臨時休業などを、開いたままの画面にも反映（画面を見ているときだけ、3分ごとに確認）
+setInterval(() => {
+  if (document.hidden) return;
+  fetchExceptions(addDays(jstNow().date, -1)).then(list => { exceptions = list; loadOk = true; render(); }).catch(() => {});
+}, 3 * 60 * 1000);
 </script>
 
 <script>
