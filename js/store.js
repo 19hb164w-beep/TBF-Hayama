@@ -101,8 +101,9 @@ export async function watchContent(cb, onError) {
   try {
     const { fs, db } = await firebase();
     const state = { texts: {}, images: {}, menu: {} };
-    let gotTexts = false, gotImages = false;
-    const emit = () => { if (gotTexts && gotImages) cb({ texts: { ...state.texts }, images: { ...state.images }, menu: { ...state.menu } }); };
+    // 文言が届いた時点でまず知らせ、写真（容量が大きい）は届いたあとにもう一度知らせる
+    let gotTexts = false;
+    const emit = () => { if (gotTexts) cb({ texts: { ...state.texts }, images: { ...state.images }, menu: { ...state.menu } }); };
     fs.onSnapshot(fs.doc(db, 'site', 'content'), snap => {
       const data = snap.exists() ? snap.data() : {};
       state.texts = data.texts || {};
@@ -111,7 +112,7 @@ export async function watchContent(cb, onError) {
     }, err => onError?.(err));
     fs.onSnapshot(fs.collection(db, 'images'), snap => {
       state.images = Object.fromEntries(snap.docs.map(d => [d.id, d.data().data]));
-      gotImages = true; emit();
+      emit();
     }, err => onError?.(err));
   } catch (err) {
     onError?.(err);
