@@ -42,7 +42,8 @@ export function youtubeId(url) {
   return m ? m[1] : null;
 }
 
-// data-youtube="URLを書く項目のキー" の枠に、動画を埋め込む
+// data-youtube="URLを書く項目のキー" の枠に、動画を埋め込む。
+// 最初はサムネイル画像だけを出し、押されたときに再生プレーヤーを読み込む（プレーヤーは重く、スマホの表示が遅くなるため）
 export function refreshVideos() {
   document.querySelectorAll('[data-youtube]').forEach(box => {
     const src = document.querySelector(`[data-edit="${box.dataset.youtube}"]`);
@@ -51,10 +52,20 @@ export function refreshVideos() {
     box.dataset.vid = id;
     box.classList.toggle('has-video', !!id);
     box.innerHTML = id
-      ? `<iframe src="https://www.youtube-nocookie.com/embed/${id}" title="YouTube動画" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`
+      ? `<button type="button" class="yt-thumb" aria-label="動画を再生">
+           <img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="" loading="lazy">
+           <span class="yt-play" aria-hidden="true"></span>
+         </button>`
       : '<span>YouTube の URL を入れると、ここに動画が表示されます</span>';
   });
 }
+
+document.addEventListener('click', e => {
+  const thumb = e.target.closest('.yt-thumb');
+  if (!thumb) return;
+  const box = thumb.closest('[data-youtube]');
+  box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${box.dataset.vid}?autoplay=1" title="YouTube動画" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+});
 
 /* ---------- 一覧（メニュー・イベント） ---------- */
 const fieldText = (item, name) => (item.querySelector(`[data-field="${name}"]`)?.innerText || '').replace(/\n+$/, '').trim();

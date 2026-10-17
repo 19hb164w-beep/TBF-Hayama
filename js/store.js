@@ -23,6 +23,81 @@ function firebase() {
   return fbPromise;
 }
 
+/* ---------- お客様画面用の軽い読み込み ----------
+   お客様画面では Firebase のプログラム一式（数百KB）を読み込まず、
+   データだけを直接取りに行く（スマホの回線でも速く表示するため）。書き込みは管理画面のみ。 */
+const DOC_ROOT = `projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents`;
+const REST = `https://firestore.googleapis.com/v1/${DOC_ROOT}`;
+const KEY = `key=${encodeURIComponent(FIREBASE_CONFIG.apiKey)}`;
+
+function decodeValue(v) {
+  if (!v) return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('timestampValue' in v) return Date.parse(v.timestampValue);
+  if ('nullValue' in v) return null;
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(decodeValue);
+  if ('mapValue' in v) return decodeFields(v.mapValue.fields);
+  return null;
+}
+const decodeFields = f => Object.fromEntries(Object.entries(f || {}).map(([k, v]) => [k, decodeValue(v)]));
+const docId = name => decodeURIComponent(name.split('/').pop());
+
+async function restJSON(url, body) {
+  const r = await fetch(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { code: r.status });
+  return r.json();
+}
+
+// 文言・メニュー（写真以外）と、構成・色をまとめて1回で取得
+export async function fetchSite() {
+  if (isDemo) {
+    const c = demoReadContent();
+    return { content: { texts: c.texts, menu: c.menu }, layout: demoReadLayout() };
+  }
+  const res = await restJSON(`https://firestore.googleapis.com/v1/${DOC_ROOT}:batchGet?${KEY}`, {
+    documents: [`${DOC_ROOT}/site/content`, `${DOC_ROOT}/site/layout`],
+  });
+  const out = { content: { texts: {}, menu: {} }, layout: null };
+  for (const r of res) {
+    if (!r.found) continue;
+    const data = decodeFields(r.found.fields);
+    if (r.found.name.endsWith('/site/content')) out.content = { texts: data.texts || {}, menu: data.menu || {} };
+    else out.layout = { order: data.order, hidden: data.hidden, theme: data.theme };
+  }
+  return out;
+}
+
+// 写真（容量が大きいので、文言を表示したあとに取得）
+export async function fetchImages() {
+  if (isDemo) return demoReadContent().images;
+  const images = {};
+  let token = '';
+  do {
+    const res = await restJSON(`${REST}/images?pageSize=50&${KEY}${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
+    for (const d of res.documents || []) images[docId(d.name)] = decodeFields(d.fields).data;
+    token = res.nextPageToken || '';
+  } while (token);
+  return images;
+}
+
+// fromDate 以降の臨時休業など
+export async function fetchExceptions(fromDate) {
+  if (isDemo) return demoRead().filter(e => e.date >= fromDate);
+  const res = await restJSON(`${REST}:runQuery?${KEY}`, {
+    structuredQuery: {
+      from: [{ collectionId: COLLECTION }],
+      where: { fieldFilter: { field: { fieldPath: 'date' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: fromDate } } },
+    },
+  });
+  return res.filter(r => r.document).map(r => {
+    const data = decodeFields(r.document.fields);
+    return { ...data, id: docId(r.document.name), createdAt: data.createdAt || 0 };
+  });
+}
+
 /* ---------- デモモード用 ---------- */
 const demoListeners = new Set();
 function demoRead() {
