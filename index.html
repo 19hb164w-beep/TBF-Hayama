@@ -9,6 +9,22 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&family=Cormorant+Garamond:ital,wght@0,600;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/month.css">
+<script>
+  // 管理画面で保存した文言・構成・色を読み込むまで、ページを隠しておく
+  // （HTML に書かれた最初の文言が一瞬見えてから切り替わるのを防ぐ）。通信が遅いときは最大3.5秒で表示する。
+  document.documentElement.classList.add('is-preparing');
+  setTimeout(function () { document.documentElement.classList.remove('is-preparing'); }, 3500);
+</script>
+<style>
+  html.is-preparing header, html.is-preparing main, html.is-preparing footer { visibility: hidden; }
+  .preparing { display: none; }
+  html.is-preparing .preparing {
+    display: grid; place-items: center; position: fixed; inset: 0; z-index: 100;
+    background: #fbf9f5; color: #1d4e6e; font: 15px/1.6 "Cormorant Garamond", serif; letter-spacing: .2em; text-align: center;
+  }
+  .preparing i { display: block; width: 28px; height: 28px; margin: 14px auto 0; border-radius: 50%; border: 2px solid #dcd5c8; border-top-color: #1d4e6e; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
 <style>
   /* 色は管理画面の「デザイン」タブで変更（--sea・--shell・--paper の3色から残りを作る） */
   :root {
@@ -320,6 +336,8 @@
 </style>
 </head>
 <body>
+
+<div class="preparing" aria-hidden="true"><div>TOKYO BAY FISHERMAN'S NOODLE<i></i></div></div>
 
 <header id="header">
   <a href="#top" class="logo"><b>TOKYO BAY FISHERMAN'S NOODLE</b><small>葉山店</small></a>
@@ -641,13 +659,23 @@ captureDefaults();
 refreshVideos();
 refreshOptional();
 applyLayout(null);
+// 保存済みの文言と構成の両方が届いたら、ページを表示する
+let gotContent = false, gotLayout = false;
+const reveal = () => document.documentElement.classList.remove('is-preparing');
+const maybeReveal = () => { if (gotContent && gotLayout) reveal(); };
 watchContent(c => {
   // 「本日は臨時休業です」などの文言も管理画面で変更できる
   setMessages(c.texts);
   if (loaded) render();
   if (!hooks.isDirty?.()) applyContent(c);
-});
-watchLayout(l => applyLayout(hooks.layoutOverride ?? l));
+  gotContent = true;
+  maybeReveal();
+}, reveal);
+watchLayout(l => {
+  applyLayout(hooks.layoutOverride ?? l);
+  gotLayout = true;
+  maybeReveal();
+}, reveal);
 
 /* --- 営業状況 --- */
 const CAL_NOTE = document.getElementById('calStatus').innerHTML;
