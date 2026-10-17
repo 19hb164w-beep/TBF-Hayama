@@ -106,9 +106,9 @@
   .empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
 
   /* tabs */
-  .tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 52px; z-index: 9; }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 52px; z-index: 9; }
   .tabs button {
-    border: 0; background: none; padding: 14px 8px; cursor: pointer; font-size: 14px; font-weight: 700; color: var(--muted);
+    border: 0; background: none; padding: 14px 4px; cursor: pointer; font-size: 14px; font-weight: 700; color: var(--muted); white-space: nowrap;
     border-bottom: 3px solid transparent;
   }
   .tabs button.active { color: var(--sea); border-bottom-color: var(--sea); }
@@ -169,6 +169,29 @@
 
   .day-detail { background: #f6f8fa; }
 
+  /* カレンダーの日付編集 */
+  .day-editor { margin-top: 16px; padding: 16px; border: 2px solid var(--sea); border-radius: 12px; background: #f8fbfd; }
+  .day-editor h3 { font-size: 17px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { padding: 10px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .chips button.on { background: var(--sea); color: #fff; border-color: var(--sea); }
+  .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+  .icons button { height: 44px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font-size: 20px; cursor: pointer; }
+  .icons button.none { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .icons button.on { border: 2px solid var(--sea); background: #e6eef5; }
+  .icons input { grid-column: span 2; height: 44px; font-size: 18px; text-align: center; padding: 0 4px; }
+  .de-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .de-actions .btn { margin-top: 14px; }
+  .btn.ghost { background: #fff; color: var(--sea); border: 1px solid var(--sea); }
+  .msgs summary { cursor: pointer; font-weight: 700; color: var(--sea); padding: 6px 0; }
+  .msgs h4 { font-size: 13px; margin: 18px 0 0; color: var(--muted); }
+
+  /* 管理者タブ */
+  .showpw { display: flex; align-items: center; gap: 8px; font-weight: 400; margin-top: 10px; }
+  .showpw input { width: 18px; height: 18px; }
+  .badge.owner { background: #fdf3e1; color: #8a6a32; }
+  .badge.me { background: #e7f4ec; color: var(--open); }
+
   .toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
     background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 14px;
@@ -192,6 +215,7 @@
   <button type="button" data-tab="schedule" class="active">営業日</button>
   <button type="button" data-tab="page">文章・写真</button>
   <button type="button" data-tab="design">デザイン</button>
+  <button type="button" data-tab="users">管理者</button>
 </nav>
 
 <main>
@@ -270,8 +294,80 @@
 
     <div class="card">
       <h2>お客様に見えるカレンダー</h2>
-      <p class="desc">日付をタップすると、その日の表示内容を確認できます。</p>
+      <p class="desc">日付をタップすると、その日の営業（昼・昼夜・休みなど）、アイコン、マスに出す文字を変えられます。</p>
       <div id="monthCal"></div>
+
+      <div class="day-editor" id="dayEditor" hidden>
+        <h3 id="deTitle"></h3>
+        <label>この日の営業</label>
+        <div class="chips" id="deType">
+          <button type="button" data-type="normal">いつもどおり</button>
+          <button type="button" data-type="lunch">昼のみ</button>
+          <button type="button" data-type="full">昼夜</button>
+          <button type="button" data-type="dinner">夜のみ</button>
+          <button type="button" data-type="custom">時間を指定</button>
+          <button type="button" data-type="closed">臨時休業</button>
+          <button type="button" data-type="private">貸切</button>
+        </div>
+        <div id="deTimes" hidden>
+          <label id="deTimesLabel">営業する時間</label>
+          <div class="times"><input type="time" id="de1s" step="300"><span>〜</span><input type="time" id="de1e" step="300"></div>
+          <div class="times"><input type="time" id="de2s" step="300"><span>〜</span><input type="time" id="de2e" step="300"></div>
+          <p class="desc" style="margin:6px 0 0">2つ目は空欄でも大丈夫です。</p>
+        </div>
+
+        <label>アイコン<span class="opt">マスの日付の横に出ます</span></label>
+        <div class="icons" id="deIcons"></div>
+
+        <label for="deLabel">マスに出す文字<span class="opt">空欄なら自動（「昼」「昼夜」など）</span></label>
+        <input type="text" id="deLabel" maxlength="6" placeholder="例：イベント">
+
+        <label for="deNote">お客様へのひとこと<span class="opt">任意</span></label>
+        <input type="text" id="deNote" maxlength="60" placeholder="例：クリスマスイベント開催！">
+
+        <div class="preview" id="dePreview"></div>
+        <div class="de-actions">
+          <button type="button" class="btn" id="deSave">この日を保存</button>
+          <button type="button" class="btn ghost" id="deClose">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>お客様に表示する文言</h2>
+      <p class="desc">「本日は臨時休業です」などの文言を変えられます。空欄にすると最初の文言に戻ります。<br>{start}・{end}・{next} は時刻や次の営業日に自動で置き換わります。</p>
+      <details class="msgs">
+        <summary>文言を変更する</summary>
+        <div id="msgFields"></div>
+        <div class="de-actions">
+          <button type="button" class="btn" id="msgSave" disabled>文言を保存して公開</button>
+          <button type="button" class="btn ghost" id="msgReset">元に戻す</button>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- 管理者の追加・削除 -->
+  <section id="usersView" hidden>
+    <div class="card">
+      <h2>管理者を追加する</h2>
+      <p class="desc">追加した人は、このメールアドレスとパスワードで管理画面にログインできるようになります。</p>
+      <form id="userForm" autocomplete="off">
+        <label for="uEmail">メールアドレス</label>
+        <input type="email" id="uEmail" required autocomplete="off" placeholder="例：staff@example.com">
+        <label for="uPass">パスワード<span class="opt">6文字以上</span></label>
+        <input type="password" id="uPass" required minlength="6" autocomplete="new-password">
+        <label class="showpw"><input type="checkbox" id="uShow"> パスワードを表示する</label>
+        <button class="btn" type="submit" id="uSubmit">管理者を追加</button>
+        <p class="err" id="uErr" hidden></p>
+      </form>
+      <p class="desc" style="margin:14px 0 0">※ パスワードは、追加した人に直接（口頭など）伝えてください。</p>
+    </div>
+
+    <div class="card">
+      <h2>管理者の一覧</h2>
+      <p class="desc">「削除」すると、その人は管理画面に入れなくなります。オーナーは削除できません。</p>
+      <ul class="list" id="userList"><li class="empty">読み込み中…</li></ul>
     </div>
   </section>
 </main>
@@ -320,12 +416,16 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { jstNow, makeContext, todayStatus, mountMonthCalendar, getDay, regularPeriods, dayLabel, esc, addDays, loadHolidays, periodText, closedText, KIND_LABEL } from './js/schedule.js';
-import { isDemo, watchExceptions, addException, removeException, watchAuth, login, logout, isAdminEmail, watchLayout, saveLayout } from './js/store.js';
+import { jstNow, makeContext, todayStatus, mountMonthCalendar, getDay, regularPeriods, dayLabel, esc, addDays, loadHolidays, periodText, closedText, KIND_LABEL, MESSAGES, setMessages, msg, DAY_ICONS, cellLabel, dayDetail } from './js/schedule.js';
+import { watchContent, saveContent } from './js/store.js';
+import { isDemo, watchExceptions, addException, removeException, watchAuth, login, logout, watchLayout, saveLayout, watchAdmins, addAdmin, removeAdmin, OWNER_EMAILS, currentEmail } from './js/store.js';
 
 const $ = id => document.getElementById(id);
 let holidays = {}, exceptions = [], started = false;
-const renderMonth = mountMonthCalendar($('monthCal'), () => ({ now: jstNow(), ctx: makeContext(holidays, exceptions) }));
+const renderMonth = mountMonthCalendar($('monthCal'), () => ({ now: jstNow(), ctx: makeContext(holidays, exceptions) }), 2, {
+  onSelect: date => openDayEditor(date),
+  hint: '日付をタップすると、その日を編集できます',
+});
 
 /* ---------- 共通 ---------- */
 let toastTimer;
@@ -348,16 +448,24 @@ if (isDemo) {
   $('loginBtn').textContent = 'デモで管理画面を開く';
 }
 
-function onAuth(user) {
-  const ok = user && (isDemo || isAdminEmail(user.email));
-  $('loginView').hidden = !!ok;
+// adminUser: 管理者としてログイン中ならそのユーザー / rawUser: ログイン中のユーザー（管理者でなくても）
+async function onAuth(adminUser, rawUser) {
+  const ok = !!adminUser;
+  if (!ok && rawUser) {
+    // 管理者から外されたアカウントなどでログインしたまま開いたとき
+    await logout();
+    $('loginErr').textContent = 'このアカウントには管理権限がありません。';
+    $('loginErr').hidden = false;
+  }
+  $('loginView').hidden = ok;
   $('logoutBtn').hidden = !ok;
   $('tabs').hidden = !ok;
   if (ok) {
-    showTab(['#page', '#design'].includes(location.hash) ? location.hash.slice(1) : 'schedule');
+    showTab(['#page', '#design', '#users'].includes(location.hash) ? location.hash.slice(1) : 'schedule');
     startApp();
   } else {
     $('appView').hidden = true;
+    $('usersView').hidden = true;
     $('pageView').hidden = true;
     $('designView').hidden = true;
     document.body.classList.remove('page-mode', 'design-mode');
@@ -368,6 +476,8 @@ function onAuth(user) {
 function showTab(tab) {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   $('appView').hidden = tab !== 'schedule';
+  $('usersView').hidden = tab !== 'users';
+  if (tab === 'users') openUsers();
   $('pageView').hidden = tab !== 'page';
   $('designView').hidden = tab !== 'design';
   document.body.classList.toggle('page-mode', tab === 'page');
@@ -377,6 +487,12 @@ function showTab(tab) {
   if (tab === 'design') openDesign();
 }
 document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+// アドレスの #page などを直接書き換えたときもタブを切り替える
+window.addEventListener('hashchange', () => {
+  if ($('tabs').hidden) return;
+  const tab = location.hash.slice(1);
+  showTab(['page', 'design', 'users'].includes(tab) ? tab : 'schedule');
+});
 
 // お客様画面を枠の中に表示し、そこへ編集機能（js/editor.js）を読み込ませる。
 // お客様画面そのものには編集機能はなく、管理画面の中で開いたときだけ編集できる。
@@ -594,6 +710,13 @@ async function startApp() {
   updateForm();
   holidays = await loadHolidays();
   watchExceptions(today, list => { exceptions = list; render(); }, () => toast('予定を読み込めませんでした', true));
+  // お客様に表示する文言（変更されていればそれを使う）
+  watchContent(c => {
+    savedTexts = c.texts || {};
+    setMessages(savedTexts);
+    if (!msgDirty) renderMsgFields();
+    render();
+  });
   setInterval(render, 60 * 1000);
 }
 
@@ -620,15 +743,182 @@ function render() {
   $('list').innerHTML = upcoming.length ? upcoming.map(e => `
     <li>
       <div class="info">
-        <div><span class="date">${esc(dayLabel(e.date))}</span><span class="badge ${esc(e.kind)}">${esc(KIND_LABEL[e.kind] || e.kind)}</span></div>
-        <div class="meta">${esc([e.hours, e.note].filter(Boolean).join('　') || (e.kind === 'private' ? '終日' : ''))}</div>
+        <div><span class="date">${esc(dayLabel(e.date))}${e.icon ? ' ' + esc(e.icon) : ''}</span><span class="badge ${esc(e.kind)}">${esc(KIND_LABEL[e.kind] || e.kind)}</span></div>
+        <div class="meta">${esc([e.hours, e.label ? `「${e.label}」` : '', e.note].filter(Boolean).join('　') || (e.kind === 'private' ? '終日' : ''))}</div>
       </div>
       <button class="del" data-id="${esc(e.id)}" data-label="${esc(dayLabel(e.date) + ' ' + (KIND_LABEL[e.kind] || ''))}">削除</button>
     </li>`).join('') : '<li class="empty">登録されている予定はありません（すべて通常営業）</li>';
 
   renderMonth();
   updatePreview();
+  if (!$('dayEditor').hidden) updateDayPreview();
 }
+
+/* ---------- カレンダーの日付をタップして編集 ---------- */
+const de = { date: null, type: 'normal', icon: '' };
+const HM = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const TYPE_HOURS = { lunch: '11:30-14:30', full: '11:30-14:30, 17:30-20:30', dinner: '17:30-20:30' };
+
+function openDayEditor(date) {
+  const today = jstNow().date;
+  if (date < today) { toast('過ぎた日は変更できません', true); $('dayEditor').hidden = true; return; }
+  de.date = date;
+  // いま登録されている内容を読み込む
+  const cur = exceptions.find(e => e.date === date && e.kind !== 'soldout');
+  de.icon = cur?.icon || '';
+  $('deLabel').value = cur?.label || '';
+  $('deNote').value = cur?.note || '';
+  ['de1s', 'de1e', 'de2s', 'de2e'].forEach(id => { $(id).value = ''; });
+  if (!cur || cur.kind === 'mark') de.type = 'normal';
+  else if (cur.kind === 'closed') de.type = 'closed';
+  else if (cur.kind === 'private') { de.type = 'private'; fillTimes(cur.hours); }
+  else {
+    const h = (cur.hours || '').replace(/\s/g, '');
+    de.type = Object.keys(TYPE_HOURS).find(k => TYPE_HOURS[k].replace(/\s/g, '') === h) || 'custom';
+    if (de.type === 'custom') fillTimes(cur.hours);
+  }
+  $('deTitle').textContent = `${dayLabel(date)} を編集`;
+  $('dayEditor').hidden = false;
+  renderIcons();
+  updateDayEditor();
+  $('dayEditor').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function fillTimes(hours) {
+  const m = [...String(hours || '').matchAll(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/g)];
+  const pad = s => s.padStart(5, '0');
+  if (m[0]) { $('de1s').value = pad(`${m[0][1]}:${m[0][2]}`); $('de1e').value = pad(`${m[0][3]}:${m[0][4]}`); }
+  if (m[1]) { $('de2s').value = pad(`${m[1][1]}:${m[1][2]}`); $('de2e').value = pad(`${m[1][3]}:${m[1][4]}`); }
+}
+
+function renderIcons() {
+  const custom = de.icon && !DAY_ICONS.includes(de.icon) ? de.icon : '';
+  $('deIcons').innerHTML =
+    `<button type="button" class="none${de.icon ? '' : ' on'}" data-icon="">なし</button>` +
+    DAY_ICONS.map(i => `<button type="button" data-icon="${i}" class="${de.icon === i ? 'on' : ''}" aria-label="アイコン ${i}">${i}</button>`).join('') +
+    `<input type="text" id="deIconCustom" maxlength="4" placeholder="ほか" value="${esc(custom)}" aria-label="好きな絵文字を入力">`;
+}
+
+function draftDay() {
+  const t = de.type;
+  const times = [[$('de1s').value, $('de1e').value], [$('de2s').value, $('de2e').value]].filter(([s, e]) => s && e);
+  const extra = { icon: de.icon, label: $('deLabel').value.trim(), note: $('deNote').value.trim() };
+  const regular = regularPeriods(de.date, makeContext(holidays, [])).length > 0;
+  if (t === 'normal') return (extra.icon || extra.label || extra.note) ? { kind: 'mark', hours: '', ...extra } : null;
+  if (t === 'closed') return { kind: 'closed', hours: '', ...extra };
+  if (t === 'private') return { kind: 'private', hours: times.map(([s, e]) => `${s}-${e}`).join(', '), ...extra };
+  const hours = t === 'custom' ? times.map(([s, e]) => `${s}-${e}`).join(', ') : TYPE_HOURS[t];
+  return { kind: regular ? 'hours' : 'open', hours, ...extra };
+}
+
+function dayError() {
+  if (de.type !== 'custom' && de.type !== 'private') return '';
+  const rows = [[$('de1s').value, $('de1e').value], [$('de2s').value, $('de2e').value]];
+  for (const [s, e] of rows) {
+    if (!s && !e) continue;
+    if (!s || !e) return '開始と終了の両方の時刻を入れてください';
+    if (s >= e) return '終了時刻は開始時刻より後にしてください';
+  }
+  if (de.type === 'custom' && !rows.some(([s, e]) => s && e)) return '営業する時間を入れてください';
+  return '';
+}
+
+function updateDayEditor() {
+  document.querySelectorAll('#deType button').forEach(b => b.classList.toggle('on', b.dataset.type === de.type));
+  $('deTimes').hidden = !(de.type === 'custom' || de.type === 'private');
+  $('deTimesLabel').textContent = de.type === 'private' ? '貸切の時間（空欄なら終日貸切）' : '営業する時間';
+  updateDayPreview();
+}
+
+function updateDayPreview() {
+  const err = dayError();
+  $('deSave').disabled = !!err;
+  if (err) { $('dePreview').textContent = err; return; }
+  const d = draftDay();
+  const others = exceptions.filter(e => e.date !== de.date || e.kind === 'soldout');
+  const ctx = makeContext(holidays, d ? [...others, { ...d, date: de.date, createdAt: Date.now() }] : others);
+  const now = jstNow();
+  const cell = cellLabel(de.date, ctx, now);
+  const det = dayDetail(de.date, ctx, now);
+  $('dePreview').innerHTML = `カレンダーのマス：<b>${cell.icon ? esc(cell.icon) + ' ' : ''}${esc(cell.lb)}</b><br>タップしたときの表示：${esc(det.text)}${det.extra ? `（${esc(det.extra)}）` : ''}`;
+}
+
+$('deType').addEventListener('click', e => {
+  const b = e.target.closest('[data-type]');
+  if (!b) return;
+  de.type = b.dataset.type;
+  if (de.type === 'custom' && !$('de1s').value) fillTimes(TYPE_HOURS.full);
+  updateDayEditor();
+});
+$('deIcons').addEventListener('click', e => {
+  const b = e.target.closest('[data-icon]');
+  if (!b) return;
+  de.icon = b.dataset.icon;
+  renderIcons();
+  updateDayPreview();
+});
+$('deIcons').addEventListener('input', e => {
+  if (e.target.id !== 'deIconCustom') return;
+  de.icon = e.target.value.trim();
+  document.querySelectorAll('#deIcons button').forEach(b => b.classList.toggle('on', b.dataset.icon === de.icon && !!de.icon));
+  updateDayPreview();
+});
+['deLabel', 'deNote', 'de1s', 'de1e', 'de2s', 'de2e'].forEach(id => $(id).addEventListener('input', updateDayPreview));
+$('deClose').addEventListener('click', () => { $('dayEditor').hidden = true; });
+
+$('deSave').addEventListener('click', async () => {
+  if (dayError()) return;
+  const btn = $('deSave');
+  btn.disabled = true;
+  try {
+    const d = draftDay();
+    // この日の登録を入れ替える（売り切れの記録は残す）
+    for (const e of exceptions.filter(x => x.date === de.date && x.kind !== 'soldout')) await removeException(e.id);
+    if (d) await addException({ ...d, date: de.date });
+    toast(`${dayLabel(de.date)} を保存しました`);
+    $('dayEditor').hidden = true;
+  } catch (err) {
+    toast(errText(err), true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------- お客様に表示する文言 ---------- */
+let savedTexts = {}, msgDirty = false;
+const MSG_GROUPS = [
+  ['本日の営業の表示（トップ）', k => k.startsWith('msg-')],
+  ['右上の小さな表示', k => k.startsWith('pill-')],
+  ['カレンダーのマスの文字', k => k.startsWith('cal-')],
+];
+
+function renderMsgFields() {
+  $('msgFields').innerHTML = MSG_GROUPS.map(([title, test]) => `<h4>${esc(title)}</h4>` +
+    Object.entries(MESSAGES).filter(([k]) => test(k)).map(([k, m]) => `
+      <label for="m-${k}">${esc(m.label)}</label>
+      <input type="text" id="m-${k}" data-msg="${k}" maxlength="${k.startsWith('cal-') ? 6 : 60}" placeholder="${esc(m.def)}" value="${esc(savedTexts[k] || '')}">`).join('')).join('');
+  msgDirty = false;
+  $('msgSave').disabled = true;
+}
+
+$('msgFields').addEventListener('input', () => {
+  msgDirty = [...document.querySelectorAll('[data-msg]')].some(i => i.value.trim() !== (savedTexts[i.dataset.msg] || ''));
+  $('msgSave').disabled = !msgDirty;
+});
+$('msgReset').addEventListener('click', renderMsgFields);
+$('msgSave').addEventListener('click', async () => {
+  const texts = {};
+  document.querySelectorAll('[data-msg]').forEach(i => { texts[i.dataset.msg] = i.value.trim(); });
+  $('msgSave').disabled = true;
+  try {
+    await saveContent({ texts });
+    msgDirty = false;
+    toast('文言を保存しました。お客様の画面に反映されました。');
+  } catch (err) {
+    toast(errText(err), true);
+    $('msgSave').disabled = false;
+  }
+});
 
 /* 今日の急な変更 */
 document.querySelectorAll('[data-quick]').forEach(btn => btn.addEventListener('click', async () => {
@@ -776,6 +1066,89 @@ $('list').addEventListener('click', async e => {
   try {
     await removeException(btn.dataset.id);
     toast('削除しました');
+  } catch (err) {
+    toast(errText(err), true);
+    btn.disabled = false;
+  }
+});
+
+/* ---------- 管理者の追加・削除 ---------- */
+let usersStarted = false, me = '';
+async function openUsers() {
+  if (usersStarted) return;
+  usersStarted = true;
+  me = await currentEmail();
+  watchAdmins(renderUsers, () => {
+    $('userList').innerHTML = '<li class="empty">一覧を読み込めませんでした。Firebase のルールが最新か確認してください。</li>';
+  });
+}
+
+function renderUsers(list) {
+  const fmtDate = ms => { const d = new Date(ms); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
+  const owners = OWNER_EMAILS.map(email => `
+    <li><div class="info"><div><span class="date">${esc(email)}</span><span class="badge owner">オーナー</span>${email === me ? '<span class="badge me">あなた</span>' : ''}</div>
+    <div class="meta">常に管理者です（削除できません）</div></div></li>`);
+  const added = [...list].sort((a, b) => a.createdAt - b.createdAt).map(a => `
+    <li><div class="info"><div><span class="date">${esc(a.email)}</span>${a.email === me ? '<span class="badge me">あなた</span>' : ''}</div>
+    <div class="meta">${esc(fmtDate(a.createdAt))} 追加${a.addedBy ? `（${esc(a.addedBy)}）` : ''}</div></div>
+    <button class="del" data-email="${esc(a.email)}">削除</button></li>`);
+  $('userList').innerHTML = owners.concat(added).join('');
+}
+
+$('uShow').addEventListener('change', () => { $('uPass').type = $('uShow').checked ? 'text' : 'password'; });
+
+$('userForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('uEmail').value.trim();
+  const pass = $('uPass').value;
+  const showErr = msg => { $('uErr').textContent = msg; $('uErr').hidden = false; };
+  $('uErr').hidden = true;
+  if (pass.length < 6) { showErr('パスワードは6文字以上にしてください。'); return; }
+
+  const btn = $('uSubmit');
+  btn.disabled = true;
+  btn.textContent = '追加しています…';
+  try {
+    try {
+      await addAdmin(email, pass);
+    } catch (err) {
+      if (err.code !== 'exists') throw err;
+      // すでにログイン用アカウントがあるメールアドレス：本人のものか確認してから管理者にする
+      if (!confirm(`${email} は、すでにアカウントが作られています。\n本人のアカウントで間違いなければ、管理者として登録します（パスワードは今入力したものではなく、本人が設定済みのものになります）。よろしいですか？`)) return;
+      await addAdmin(email, pass, { allowExisting: true });
+    }
+    toast(`${email} を管理者に追加しました`);
+    $('userForm').reset();
+    $('uPass').type = 'password';
+  } catch (err) {
+    const code = err.code || '';
+    showErr(
+      code === 'already-admin' ? 'このメールアドレスは、すでに管理者です。' :
+      code === 'auth/invalid-email' ? 'メールアドレスの形式が正しくありません。' :
+      code === 'auth/weak-password' ? 'パスワードが簡単すぎます。6文字以上で、推測されにくいものにしてください。' :
+      code === 'auth/operation-not-allowed' ? 'Firebase で「メール / パスワード」のログインが有効になっていません。' :
+      code === 'permission-denied' ? '追加できませんでした（権限がありません）。Firebase のルールが最新か確認してください。' :
+      `追加できませんでした。もう一度お試しください。${code ? `（${code}）` : ''}`,
+    );
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '管理者を追加';
+  }
+});
+
+$('userList').addEventListener('click', async e => {
+  const btn = e.target.closest('.del[data-email]');
+  if (!btn) return;
+  const email = btn.dataset.email;
+  const self = email === me;
+  if (!confirm(self
+    ? `あなた自身（${email}）を管理者から外します。このあと管理画面に入れなくなります。よろしいですか？`
+    : `${email} を管理者から外しますか？この人は管理画面に入れなくなります。`)) return;
+  btn.disabled = true;
+  try {
+    await removeAdmin(email);
+    toast(`${email} を管理者から外しました`);
+    if (self) location.reload();
   } catch (err) {
     toast(errText(err), true);
     btn.disabled = false;

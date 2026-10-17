@@ -630,23 +630,29 @@
 <script type="module">
 /* ===== 営業状況・ページ内容・構成 =====
    このページ自体には編集機能はない。文章・写真・メニュー・構成・色は管理画面（admin.html）から変更する。 */
-import { jstNow, makeContext, todayStatus, alertsHTML, dayLabel, esc, loadHolidays, addDays, mountMonthCalendar } from './js/schedule.js';
+import { jstNow, makeContext, todayStatus, alertsHTML, dayLabel, esc, loadHolidays, addDays, mountMonthCalendar, setMessages } from './js/schedule.js';
 import { watchExceptions, watchContent, watchLayout } from './js/store.js';
 import { captureDefaults, applyContent, applyLayout, refreshOptional, refreshVideos, hooks } from './js/content.js';
+
+let holidays = {}, exceptions = [], loadOk = true, loaded = false;
 
 /* --- 文章・写真・メニュー・構成・色 --- */
 captureDefaults();
 refreshVideos();
 refreshOptional();
 applyLayout(null);
-watchContent(c => { if (!hooks.isDirty?.()) applyContent(c); });
+watchContent(c => {
+  // 「本日は臨時休業です」などの文言も管理画面で変更できる
+  setMessages(c.texts);
+  if (loaded) render();
+  if (!hooks.isDirty?.()) applyContent(c);
+});
 watchLayout(l => applyLayout(hooks.layoutOverride ?? l));
 
 /* --- 営業状況 --- */
 const CAL_NOTE = document.getElementById('calStatus').innerHTML;
 const FAIL_NOTE = '※臨時休業の情報を読み込めませんでした。通常の営業時間を表示しています。最新の営業状況は <a href="https://www.instagram.com/tbf_hayama/" target="_blank" rel="noopener">Instagram</a> をご確認ください。';
-let holidays = {}, exceptions = [], loadOk = true, loaded = false;
-const state = () => ({ now: jstNow(), ctx: makeContext(holidays, exceptions) });
+const state =() => ({ now: jstNow(), ctx: makeContext(holidays, exceptions) });
 const renderMonth = mountMonthCalendar(document.getElementById('monthCal'), state);
 
 function render() {
