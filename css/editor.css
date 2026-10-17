@@ -1,0 +1,109 @@
+/* 編集モード（index.html?edit）の見た目 */
+.ed-bar [hidden], .ed-img [hidden] { display: none !important; }
+body.editing { padding-bottom: 110px; }
+
+body.editing [data-edit], body.editing [data-field] {
+  outline: 1.5px dashed rgba(201, 164, 106, .95);
+  outline-offset: 4px;
+  border-radius: 2px;
+  cursor: text;
+  min-width: 1.5em;
+  transition: background .15s;
+}
+body.editing [data-edit]:hover, body.editing [data-field]:hover { background: rgba(201, 164, 106, .14); }
+body.editing [data-edit]:focus, body.editing [data-field]:focus { outline: 2.5px solid #c9a46a; background: rgba(201, 164, 106, .18); }
+body.editing [data-edit]:empty::before, body.editing [data-field]:empty::before { content: attr(data-ph); opacity: .5; font-weight: 400; }
+body.editing a[data-edit] { cursor: text; }
+body.editing .tag[data-field]:empty { background: transparent; color: inherit; }
+body.editing [data-field="desc"]:empty { display: block; }
+
+/* メニューの品目操作 */
+.ed-item { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; flex-basis: 100%; }
+body.editing .topping-list li { flex-wrap: wrap; }
+.ed-mini {
+  min-width: 40px; height: 34px; padding: 0 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid #dcd5c8; background: #fff; color: #10243a;
+  font: 700 13px/1 "Noto Sans JP", system-ui, sans-serif;
+}
+.ed-mini.danger { color: #c0392b; border-color: #f0c4be; }
+.ed-mini:hover { border-color: #1d4e6e; }
+.ed-add {
+  display: block; width: 100%; margin-top: 16px; padding: 14px; cursor: pointer;
+  border: 2px dashed #c9a46a; border-radius: 8px; background: rgba(201, 164, 106, .08);
+  color: #8a6a32; font: 700 15px/1 "Noto Sans JP", system-ui, sans-serif; letter-spacing: .06em;
+}
+.ed-add:hover { background: rgba(201, 164, 106, .18); }
+
+/* 編集中は空の項目も表示して、入力できるようにする */
+body.editing .is-empty { display: revert !important; }
+body.editing .gallery-grid figure.is-empty { display: block !important; }
+
+/* 写真の操作ボタン */
+[data-img] { position: relative; }
+.ed-img {
+  position: absolute; right: 12px; bottom: 12px; z-index: 5;
+  display: flex; gap: 8px;
+}
+
+/* トップの写真スライド：編集中は3枚を並べて表示し、1枚ずつ差し替えられるようにする */
+body.editing .hero { place-items: start center; padding-top: 90px; }
+body.editing .hero-slides {
+  position: relative; inset: auto; z-index: 3;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  width: min(640px, calc(100% - 32px)); margin: 0 auto 28px;
+}
+body.editing .hero-slides::after { display: none; }
+body.editing .hero-slides .slide {
+  position: relative; inset: auto; opacity: 1; aspect-ratio: 16 / 10; border-radius: 4px;
+  border: 1.5px dashed rgba(255, 255, 255, .6); background-color: rgba(255, 255, 255, .08);
+}
+body.editing .hero-slides .slide > span { display: grid; place-items: center; height: 100%; font-size: 12px; letter-spacing: .1em; }
+body.editing .hero-slides .slide.has-img > span { display: none; }
+.hero-slides .ed-img { right: 6px; bottom: 6px; flex-direction: column; align-items: flex-end; gap: 4px; }
+.hero-slides .ed-btn { min-height: 30px; font-size: 11px; padding: 0 8px; }
+
+/* YouTube の URL 入力欄 */
+body.editing .url-field [data-edit] { display: inline-block; min-width: 60%; }
+.ed-img .busy { opacity: .6; pointer-events: none; }
+.ed-img .busy::after { content: '…'; }
+
+/* 下部の操作バー */
+.ed-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: #10243a; color: #fff; box-shadow: 0 -4px 20px rgba(0, 0, 0, .2);
+  font-family: "Noto Sans JP", system-ui, sans-serif; letter-spacing: .02em;
+}
+.ed-msg { display: flex; flex-direction: column; line-height: 1.5; min-width: 0; }
+.ed-msg b { font-size: 14px; color: #e6c890; }
+.ed-count { font-size: 12px; opacity: .85; }
+.ed-count.pending { color: #ffd27a; opacity: 1; font-weight: 700; }
+.ed-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.ed-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: 42px; padding: 0 16px; border-radius: 8px; border: 0; cursor: pointer;
+  font: 700 14px/1 "Noto Sans JP", system-ui, sans-serif; text-decoration: none; letter-spacing: .04em;
+  white-space: nowrap;
+}
+.ed-btn.primary { background: #c9a46a; color: #10243a; }
+.ed-btn.primary:disabled { background: #5d6b78; color: #c4ccd4; cursor: default; }
+.ed-btn.ghost { background: rgba(255, 255, 255, .14); color: #fff; }
+.ed-img .ed-btn.ghost { background: rgba(16, 36, 58, .8); }
+.ed-img .ed-btn { box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+
+.ed-toast {
+  position: fixed; left: 50%; bottom: 120px; z-index: 101; transform: translateX(-50%) translateY(16px);
+  background: #2f8f5b; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 14px;
+  opacity: 0; pointer-events: none; transition: .25s; max-width: calc(100% - 32px); text-align: center;
+  font-family: "Noto Sans JP", system-ui, sans-serif;
+}
+.ed-toast.show { opacity: 1; transform: translateX(-50%); }
+.ed-toast.error { background: #c0392b; }
+
+@media (max-width: 600px) {
+  .ed-bar { flex-direction: column; align-items: stretch; }
+  .ed-actions { display: grid; grid-template-columns: auto auto 1fr; }
+  .ed-btn { padding: 0 12px; }
+}

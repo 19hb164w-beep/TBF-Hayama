@@ -1,0 +1,63 @@
+/* 1か月カレンダー（お客様画面・管理画面共通） */
+.month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.month-nav h3 { font-size: 18px; letter-spacing: .1em; font-weight: 700; }
+.month-nav button {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid #dcd5c8; background: #fff;
+  font-size: 20px; line-height: 1; cursor: pointer; color: var(--sea, #1d4e6e);
+}
+.month-nav button:disabled { opacity: .3; cursor: default; }
+
+.month { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff; }
+.month th { font-size: 12px; font-weight: 500; padding: 6px 0; text-align: center; color: #5d6b78; border-bottom: 1px solid #dcd5c8; }
+.month th.sun { color: #c0392b; }
+.month th.sat { color: #2563a8; }
+.month td { border: 1px solid #ece7de; padding: 0; vertical-align: top; }
+.month td.blank { background: #faf8f4; }
+
+.month .cell {
+  width: 100%; height: 64px; border: 0; background: transparent; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px;
+  padding: 6px 2px; font: inherit; color: var(--ink, #10243a);
+}
+.month .cell .num { font-size: 14px; font-weight: 500; line-height: 1.2; }
+.month .cell.sun .num { color: #c0392b; }
+.month .cell.sat .num { color: #2563a8; }
+.month .cell .lb:empty { display: none; }
+.month td.blank { height: 64px; }
+.month .cell .lb { font-size: 11px; font-weight: 700; line-height: 1.2; padding: 2px 5px; border-radius: 3px; white-space: nowrap; }
+
+.month .st-lunch .lb { color: var(--sea, #1d4e6e); background: color-mix(in srgb, var(--sea, #1d4e6e) 12%, #fff); }
+.month .st-full .lb  { color: #fff; background: var(--sea, #1d4e6e); }
+.month .st-off .lb   { color: #7a8692; background: transparent; font-weight: 500; }
+.month .st-alert     { background: #fdecea; }
+.month .st-alert .lb { color: #fff; background: #c0392b; }
+.month .st-change    { background: #fdf6e8; }
+.month .st-change .lb { color: #fff; background: #c98a1b; }
+.month .cell.past { opacity: .35; }
+.month .cell.is-today { box-shadow: inset 0 0 0 2px var(--sea, #1d4e6e); }
+.month .cell.selected { box-shadow: inset 0 0 0 3px var(--shell, #c9a46a); }
+.month .cell:focus-visible { outline: 2px solid var(--sea, #1d4e6e); outline-offset: -3px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: 12px; color: #5d6b78; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid #dcd5c8; }
+.legend i.st-lunch { background: color-mix(in srgb, var(--sea, #1d4e6e) 12%, #fff); }
+.legend i.st-full { background: var(--sea, #1d4e6e); border-color: var(--sea, #1d4e6e); }
+.legend i.st-off { background: #fff; }
+.legend i.st-alert { background: #c0392b; border-color: #c0392b; }
+.legend i.st-change { background: #c98a1b; border-color: #c98a1b; }
+
+.day-detail {
+  margin-top: 14px; padding: 14px 16px; background: #fff; border-left: 3px solid var(--sea, #1d4e6e);
+  font-size: 14px; line-height: 1.7; color: #5d6b78;
+}
+.day-detail b { color: var(--ink, #10243a); margin-right: 8px; }
+.day-detail small { display: block; font-size: 12px; }
+.day-detail.irregular { border-left-color: #c0392b; background: #fdecea; color: #7b241c; }
+
+@media (max-width: 480px) {
+  .month .cell, .month td.blank { height: 56px; }
+  .month .cell { padding: 5px 1px; gap: 3px; }
+  .month .cell .num { font-size: 13px; }
+  .month .cell .lb { font-size: 10px; padding: 1px 3px; }
+}
